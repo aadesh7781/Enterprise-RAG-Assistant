@@ -3,6 +3,11 @@ from fastapi import FastAPI, Depends
 
 from fastapi import FastAPI
 from app.schemas.chat import ChatRequest, ChatResponse
+from fastapi import Depends
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.database.session import get_db
 
 app = FastAPI(
     title="Enterprise RAG Assistant",
@@ -49,4 +54,14 @@ def get_documents(pagination: dict = Depends(get_pagination)):
     return {
         "message": "Documents retrieved",
         "pagination": pagination
+    }
+
+@app.get("/api/v1/health/database")
+def database_health(db: Session = Depends(get_db)):
+
+    db.execute(text("SELECT 1"))
+
+    return {
+        "status": "connected",
+        "database": "Neon PostgreSQL"
     }
