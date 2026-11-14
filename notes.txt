@@ -1,0 +1,235 @@
+Our project will be a full-stack, secure enterprise knowledge assistant with:
+- Departments: HR, Finance and Engineering.
+- Backend: Python + FastAPI.
+- Frontend: React.
+- Knowledge retrieval: RAG using Chroma, embeddings and hybrid search.
+- Database: PostgreSQL.
+- LLM: Groq.
+- Deployment: Docker + AWS.
+We'll build this as a modular monolith, not a collection of microservices. This keeps development and deployment manageable while preserving clear boundaries between components. We can split services later if scale or operational requirements justify it.
+
+1. Product Requirements Document (PRD)
+1.1 Problem statement
+Companies store important information across PDFs, policies, reports and internal documents.
+
+Employees often need to search through multiple documents to find answers. Traditional keyword search may not understand the meaning of a question, and general-purpose LLMs do not automatically have access to private company knowledge.
+
+Our application will allow employees to ask natural-language questions and receive answers grounded in documents they are authorized to access.
+1.2 Project goals
+1. Make company knowledge searchable through natural language.
+2. Generate answers grounded in internal documents.
+3. Prevent unauthorized document access.
+4. Provide source citations for answers.
+5. Support document uploads and management.
+6. Maintain conversation history securely.
+7. Measure retrieval and answer quality.
+8. Deploy the application to the cloud.
+1.3 User roles and permissions
+Role	Main permissions
+Employee	Ask questions and view authorized sources
+Department Admin	Upload and manage permitted department documents
+Super Admin	Manage users, departments and permissions
+
+Example access rules:
+Document	HR employee	Finance employee	Payroll admin
+Leave policy	Yes	No	Yes
+Salary records	No	No	Yes
+Expense policy	No	Yes	No
+Engineering handbook	No	No	No
+
+These are illustrative rules. We will define the actual document permissions in our authorization model.
+
+Important: Access will be checked by the backend before document content reaches the LLM. A prompt saying "don't reveal confidential information" is not an access-control mechanism.
+1.4 Functional requirements
+ID	Requirement	Expected behavior
+FR-01	Authentication	Users can securely log in
+FR-02	Authorization	Users access only permitted resources
+FR-03	Document upload	Admins upload PDF, DOCX and TXT
+FR-04	Document processing	Extract and validate document text
+FR-05	Chunking	Split documents into meaningful chunks
+FR-06	Embeddings	Convert chunks into vectors
+FR-07	Retrieval	Retrieve relevant authorized chunks
+FR-08	Reranking	Improve ordering of retrieved chunks
+FR-09	Answer generation	Generate grounded answers
+FR-10	Citations	Show document and page references
+FR-11	Chat history	Store and retrieve conversations securely
+FR-12	Document management	View, update and delete documents
+FR-13	Evaluation	Measure retrieval and generation quality
+FR-14	Administration	Manage users, roles and permissions
+
+1.5 Non-functional requirements
+These define how well the application should operate.
+- Security: Enforce authentication, authorization and tenant isolation.
+- Reliability: Handle invalid documents and failed LLM requests gracefully.
+- Performance: Measure API, retrieval and generation latency.
+- Scalability: Keep components modular and support future scaling.
+- Maintainability: Use clear folder structure, schemas and tests.
+- Accuracy: Evaluate retrieval and answer quality against labelled data.
+- Traceability: Preserve document IDs, versions and source references.
+- Deployability: Run consistently using Docker and cloud infrastructure.
+We will set numerical performance targets after establishing a working baseline, rather than inventing targets without measurements.
+1.6 Acceptance criteria
+The project will not be considered complete just because the interface works.
+Feature	Acceptance criterion
+Login	Invalid credentials are rejected
+Document access	Unauthorized users cannot retrieve restricted documents
+Upload	Invalid file types are rejected
+Ingestion	Valid documents are chunked and indexed
+Retrieval	Relevant authorized documents are returned
+Generation	Answers are grounded in retrieved evidence
+Citations	Each citation refers to a real source
+History	Users cannot access another user's conversations
+Security	Adversarial access and injection tests are performed
+Evaluation	Retrieval and generation metrics are reported
+Deployment	Application is accessible through a secure cloud deployment
+
+
+2. System Architecture
+2.1 High-level architecture
+React Frontend
+
+Login · Chat · Upload · Admin panel
+
+HTTPS / REST API
+
+FastAPI Backend
+
+Authentication · Authorization · API validation
+
+
+Application Layer
+Ingestion
+
+Extract · Validate · Chunk · Embed
+
+
+Retrieval
+
+Semantic · BM25 · Hybrid · MMR
+
+
+RAG
+
+Context · Prompt · Generation
+
+
+Security
+
+Permissions · Validation · Isolation
+
+
+
+
+
+PostgreSQL
+
+Users · Roles · Permissions · Chat metadata
+
+
+ChromaDB
+
+Embeddings · Chunk retrieval
+
+
+Groq API
+
+LLM generation
+
+
+Object Storage
+
+Original documents
+
+
+
+
+This is our logical architecture. We won't build every component simultaneously.
+2.2 Two major workflows
+A. Document ingestion workflow
+Admin uploads document
+
+Backend validates file and permissions
+
+Extract text and page information
+
+Split into chunks
+
+Attach metadata and permissions
+
+Generate embeddings
+
+Store vectors and document records
+
+
+B. Question-answering workflow
+Employee submits question
+
+Authenticate user
+
+Identify authorized document scope
+
+Run semantic and keyword retrieval
+
+Apply permission checks and reranking
+
+Assemble context within token budget
+
+Generate answer using Groq
+
+Validate evidence and citations
+
+Return answer to React frontend
+
+
+Notice the security checks happen before the retrieved content is passed to the LLM. This is a critical architectural decision.
+2.3 Database responsibilities
+We will use different storage systems for different types of information.
+Storage	What it stores
+PostgreSQL	Users, roles, permissions, document records, conversations
+ChromaDB	Vector embeddings and searchable chunk metadata
+Object storage	Original PDF, DOCX and TXT files
+
+Why not put everything in ChromaDB?
+
+Because a vector database is primarily for similarity retrieval. Users, permissions, transactional records and conversation ownership need reliable structured database operations.
+2.4 Cloud architecture – target
+AWS deployment target
+Frontend hosting
+
+React application
+
+
+Compute
+
+Dockerized FastAPI
+
+
+RDS PostgreSQL
+
+Application database
+
+
+Amazon S3
+
+Document storage
+
+
+
+Vector storage will be selected after comparing deployment and operational requirements. We may initially host Chroma with the backend or choose a managed alternative if justified.
+
+We will add secrets management, HTTPS, health checks, logging, monitoring, tracing and CI/CD as we learn the relevant production concepts.
+
+3. Architecture decisions – initial ADRs
+An ADR is an Architecture Decision Record. It documents why a technical choice was made.
+Decision	Initial choice	Reason
+Backend architecture	Modular monolith	Simpler to build and operate
+Backend framework	FastAPI	Python ecosystem and API validation
+Application database	PostgreSQL	Structured relational data
+Vector store	Chroma	Already learned and suitable for initial implementation
+Embeddings	Sentence Transformers	Local embedding generation
+LLM	Groq	Previously integrated and familiar
+Frontend	React	Full frontend application experience
+Containers	Docker	Reproducible deployment
+Cloud	AWS	Production deployment experience
+
+These decisions are provisional. For example, if Chroma's operational requirements become unsuitable for our deployment, we will compare alternatives rather than choosing a managed vector database just for the sake of using one.
