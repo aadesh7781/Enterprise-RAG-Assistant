@@ -1,17 +1,19 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.models import User
-from app.schemas.auth import UserRegister, UserResponse
-from app.security.password import hash_password
-
-from app.schemas.auth import UserLogin, TokenResponse
-from app.security.password import verify_password
+from app.models import User, Role
+from app.schemas.auth import (
+    UserRegister,
+    UserResponse,
+    UserLogin,
+    TokenResponse
+)
+from app.security.password import hash_password, verify_password
 from app.security.token import create_access_token
-
 from app.security.dependencies import get_current_user
 
 
@@ -20,6 +22,10 @@ router = APIRouter(
     tags=["Authentication"]
 )
 
+
+# -------------------------
+# USER REGISTRATION
+# -------------------------
 
 @router.post(
     "/register",
@@ -42,10 +48,23 @@ def register_user(
             detail="Email already registered"
         )
 
+    # Retrieve default EMPLOYEE role
+    employee_role = db.scalar(
+        select(Role).where(Role.name == "EMPLOYEE")
+    )
+
+    if employee_role is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Default employee role is not configured"
+        )
+
+    # Create new user with default role
     new_user = User(
         email=email,
         full_name=user_data.full_name,
-        password_hash=hash_password(user_data.password)
+        password_hash=hash_password(user_data.password),
+        roles=[employee_role]
     )
 
     try:
@@ -62,6 +81,11 @@ def register_user(
         )
 
     return new_user
+
+
+# -------------------------
+# USER LOGIN
+# -------------------------
 
 @router.post(
     "/login",
@@ -95,7 +119,15 @@ def login_user(
         token_type="bearer"
     )
 
-@router.get("/me", response_model=UserResponse)
+
+# -------------------------
+# CURRENT AUTHENTICATED USER
+# -------------------------
+
+@router.get(
+    "/me",
+    response_model=UserResponse
+)
 def get_me(
     current_user: User = Depends(get_current_user)
 ):

@@ -38,3 +38,9 @@ class User(Base):
     department: Mapped["Department | None"] = relationship(
         back_populates="users"
     )
+
+    roles: Mapped[list["Role"]] = relationship(
+    "Role",
+    secondary="user_roles",
+    back_populates="users"
+)
