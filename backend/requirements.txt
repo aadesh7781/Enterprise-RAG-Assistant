@@ -13,3 +13,11 @@ pwdlib[argon2]
 email-validator
 
 PyJWT
+
+python-multipart
+
+pymupdf
+python-docx
+
+sentence-transformers
+chromadb

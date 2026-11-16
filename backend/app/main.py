@@ -9,6 +9,9 @@ from app.schemas.chat import ChatRequest, ChatResponse
 from app.database.session import get_db
 from app.api.routes.auth import router as auth_router
 from app.api.routes.admin import router as admin_router
+from app.api.routes.documents import router as documents_router
+
+from app.api.routes.retrieval import router as retrieval_router
 
 
 app = FastAPI(
@@ -20,6 +23,9 @@ app = FastAPI(
 # Register authentication routes
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(documents_router)
+
+app.include_router(retrieval_router)
 
 @app.get("/api/v1/health")
 def health_check():
