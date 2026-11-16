@@ -1,3 +1,4 @@
+
 from uuid import UUID, uuid4
 
 from sqlalchemy import ForeignKey, String
@@ -40,7 +41,13 @@ class User(Base):
     )
 
     roles: Mapped[list["Role"]] = relationship(
-    "Role",
-    secondary="user_roles",
-    back_populates="users"
-)
+        "Role",
+        secondary="user_roles",
+        back_populates="users"
+    )
+
+    conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
