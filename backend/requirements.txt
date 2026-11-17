@@ -23,3 +23,5 @@ sentence-transformers
 chromadb
 
 langchain-groq
+
+rank-bm25

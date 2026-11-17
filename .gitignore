@@ -28,3 +28,8 @@ chroma_db/
 
 # Logs
 *.log
+
+# Uploaded company documents
+data/documents/
+
+chroma_db/

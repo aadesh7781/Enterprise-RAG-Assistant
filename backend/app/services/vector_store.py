@@ -44,8 +44,7 @@ def store_document_chunks(
 
     document_id_str = str(document_id)
 
-    # Remove previous vectors for this document before re-indexing.
-        # Remove old chunks if this document is being reprocessed.
+    # Remove old chunks if this document is being reprocessed.
     collection.delete(
         where={"document_id": document_id_str}
     )
