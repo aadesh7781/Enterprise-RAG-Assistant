@@ -1,4 +1,7 @@
+
 from uuid import UUID
+
+from sqlalchemy import select
 
 from app.database.connection import SessionLocal
 from app.models import Document
@@ -8,9 +11,15 @@ from app.services.vector_store import store_document_chunks
 
 def process_document_background(document_id: str) -> None:
 
+    document_uuid = UUID(document_id)
+
     with SessionLocal() as db:
 
-        document = db.get(Document, UUID(document_id))
+        document = db.scalar(
+            select(Document)
+            .where(Document.id == document_uuid)
+            .with_for_update()
+        )
 
         if document is None:
             return
@@ -38,7 +47,7 @@ def process_document_background(document_id: str) -> None:
 
             failed_document = db.get(
                 Document,
-                UUID(document_id)
+                document_uuid
             )
 
             if failed_document is not None:

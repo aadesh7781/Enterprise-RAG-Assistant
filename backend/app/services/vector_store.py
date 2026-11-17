@@ -1,3 +1,4 @@
+
 from pathlib import Path
 from uuid import UUID
 
@@ -69,4 +70,16 @@ def store_document_chunks(
         embeddings=embeddings,
         metadatas=metadatas
     )
+
     return len(chunks)
+
+
+def delete_document_chunks(document_id: UUID) -> None:
+    """
+    Delete every vector chunk associated with a document.
+    """
+    collection = get_collection()
+
+    collection.delete(
+        where={"document_id": str(document_id)}
+    )

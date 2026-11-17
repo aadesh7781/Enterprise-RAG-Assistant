@@ -175,14 +175,25 @@ def generate_answer(
     is_valid, rejection_message = validate_input_format(question)
 
     if not is_valid:
+        print("[RAG DEBUG] Input format validation failed.")
         return rejection_message
 
     # Layer 2: Semantic classification
     classification = classify_user_input(question)
 
+    print(
+        "[RAG DEBUG] Semantic classification:",
+        classification
+    )
+
     if not classification["allowed"]:
 
         category = classification["category"]
+
+        print(
+            "[RAG DEBUG] Question rejected by semantic guardrail:",
+            category
+        )
 
         return REJECTION_MESSAGES.get(
             category,
@@ -195,6 +206,7 @@ def generate_answer(
         is_valid, rejection_message = validate_user_input(question)
 
         if not is_valid:
+            print("[RAG DEBUG] Deterministic input validation failed.")
             return rejection_message
 
     # Layer 4: Detect and filter suspicious document chunks
@@ -205,7 +217,15 @@ def generate_answer(
         for chunk in safe_chunks
     }
 
+    print("\n========== RAG DEBUG ==========")
+    print("Question:", question)
+    print("Retrieved chunks:", len(retrieved_chunks))
+    print("Safe chunks:", len(safe_chunks))
+
     if not safe_chunks:
+        print("No safe chunks available.")
+        print("================================\n")
+
         return (
             "I could not find relevant, safe information "
             "in the documents you are authorized to access."
@@ -234,6 +254,9 @@ def generate_answer(
         ensure_ascii=True
     )
 
+    print("Valid source numbers:", valid_source_numbers)
+    print("Context source count:", len(context_sources))
+
     # Layer 6: Serialize conversation history
     history = format_conversation_history(
         conversation_history
@@ -246,19 +269,33 @@ def generate_answer(
 
     chain = prompt | get_llm()
 
+    print("[RAG DEBUG] Sending context to Groq...")
+
     response = chain.invoke({
         "context": context,
         "history": history,
         "question": question
     })
 
-    # Layer 7: Validate generated response
+    # Layer 7: Inspect generated response
     answer = response.content
 
+    print("\n---------- LLM RESPONSE ----------")
+    print("Response type:", type(answer).__name__)
+    print("Raw LLM response:", repr(answer))
+    print("----------------------------------")
+
+    # Layer 8: Validate generated response
     is_valid, validation_message = validate_llm_output(
         answer,
         valid_source_numbers
     )
+
+    print("\n---------- OUTPUT VALIDATION ----------")
+    print("Validation passed:", is_valid)
+    print("Validation message:", validation_message)
+    print("---------------------------------------")
+    print("=======================================\n")
 
     if not is_valid:
         return OUTPUT_FALLBACK
