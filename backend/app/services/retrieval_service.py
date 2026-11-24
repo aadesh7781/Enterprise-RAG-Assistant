@@ -4,6 +4,7 @@ from app.services.vector_store import get_collection
 from app.services.bm25_service import search_bm25
 from app.services.reranker_service import rerank_chunks
 
+
 MAX_COSINE_DISTANCE = 0.55
 RRF_CONSTANT = 60
 
@@ -22,7 +23,10 @@ def search_semantic_chunks(query, authorized_document_ids, top_k):
     if collection.count() == 0:
         return []
 
-    query_embedding = generate_embeddings([query])[0]
+    query_embedding = generate_embeddings(
+        [query],
+        task="retrieval.query"
+    )[0]
 
     results = collection.query(
         query_embeddings=[query_embedding],
@@ -90,7 +94,6 @@ def reciprocal_rank_fusion(ranking_lists, top_k):
     return ranked_results[:top_k]
 
 
-
 def apply_mmr(query, candidates, top_k, lambda_mult=MMR_LAMBDA):
     """
     Select relevant and diverse chunks using Maximal Marginal Relevance.
@@ -107,14 +110,17 @@ def apply_mmr(query, candidates, top_k, lambda_mult=MMR_LAMBDA):
 
     texts = [chunk["text"] for chunk in candidates]
 
-    # Generate embeddings for query and candidate chunks.
-    embeddings = generate_embeddings([query] + texts)
+    # Generate query and passage embeddings using the correct Jina tasks.
+    query_embedding = generate_embeddings(
+        [query],
+        task="retrieval.query"
+    )[0]
 
-    query_embedding = embeddings[0]
-    document_embeddings = embeddings[1:]
+    document_embeddings = generate_embeddings(
+        texts,
+        task="retrieval.passage"
+    )
 
-    # Python lists do not support @.
-    # Calculate cosine similarity using dot product.
     def cosine_similarity(vector_a, vector_b):
         return sum(
             a * b for a, b in zip(vector_a, vector_b)
@@ -124,19 +130,15 @@ def apply_mmr(query, candidates, top_k, lambda_mult=MMR_LAMBDA):
     remaining_indices = list(range(len(candidates)))
 
     while remaining_indices and len(selected_indices) < top_k:
-
         best_index = None
         best_score = float("-inf")
 
         for candidate_index in remaining_indices:
-
-            # Query-to-document relevance.
             relevance = cosine_similarity(
                 document_embeddings[candidate_index],
                 query_embedding
             )
 
-            # Similarity to previously selected documents.
             if selected_indices:
                 redundancy = max(
                     cosine_similarity(
@@ -148,7 +150,6 @@ def apply_mmr(query, candidates, top_k, lambda_mult=MMR_LAMBDA):
             else:
                 redundancy = 0.0
 
-            # MMR objective.
             mmr_score = (
                 lambda_mult * relevance
                 - (1 - lambda_mult) * redundancy
@@ -165,7 +166,6 @@ def apply_mmr(query, candidates, top_k, lambda_mult=MMR_LAMBDA):
         candidates[index]
         for index in selected_indices
     ]
-
 
 
 def search_authorized_chunks(query, authorized_document_ids, top_k=5):
@@ -207,7 +207,7 @@ def search_authorized_chunks(query, authorized_document_ids, top_k=5):
         top_k=reranking_k
     )
 
-    # 5. Cross-encoder reranks the diversified candidates.
+    # 5. Jina reranks the diversified candidates.
     final_results = rerank_chunks(
         query=query,
         candidates=diversified_results,

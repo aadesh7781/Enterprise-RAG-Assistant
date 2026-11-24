@@ -33,3 +33,5 @@ chroma_db/
 data/documents/
 
 chroma_db/
+data/
+frontend/backend_openapi.json

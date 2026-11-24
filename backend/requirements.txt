@@ -1,7 +1,9 @@
+
 fastapi
 uvicorn[standard]
 pydantic-settings
 python-dotenv
+requests
 
 sqlalchemy
 psycopg[binary]
@@ -19,7 +21,6 @@ python-multipart
 pymupdf
 python-docx
 
-sentence-transformers
 chromadb
 
 langchain-groq

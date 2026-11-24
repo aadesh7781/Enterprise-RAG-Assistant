@@ -1,59 +1,74 @@
 
-from sentence_transformers import CrossEncoder
+import requests
+
+from app.core.config import settings
 
 
-MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+JINA_RERANK_URL = "https://api.jina.ai/v1/rerank"
+MODEL_NAME = "jina-reranker-v3.5"
+REQUEST_TIMEOUT = 60
 
-_reranker = None
 
-
-def get_reranker():
+def rerank_chunks(
+    query: str,
+    candidates: list[dict],
+    top_k: int = 5
+) -> list[dict]:
     """
-    Load the cross-encoder once and reuse it.
-    """
-
-    global _reranker
-
-    if _reranker is None:
-        _reranker = CrossEncoder(
-            MODEL_NAME,
-            device="cpu"
-        )
-
-    return _reranker
-
-
-def rerank_chunks(query, candidates, top_k=5):
-    """
-    Score query-document pairs and return the
-    highest-scoring candidate chunks.
+    Rerank retrieved chunks using Jina AI.
     """
 
     if not candidates:
         return []
 
-    model = get_reranker()
+    if not settings.jina_api_key:
+        raise RuntimeError("JINA_API_KEY is not configured")
 
-    pairs = [
-        (query, chunk["text"])
-        for chunk in candidates
-    ]
+    payload = {
+        "model": MODEL_NAME,
+        "query": query,
+        "documents": [
+            chunk["text"] for chunk in candidates
+        ],
+        "top_n": min(top_k, len(candidates)),
+        "return_documents": False,
+    }
 
-    scores = model.predict(
-        pairs,
-        show_progress_bar=False
-    )
+    headers = {
+        "Authorization": f"Bearer {settings.jina_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        response = requests.post(
+            JINA_RERANK_URL,
+            headers=headers,
+            json=payload,
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+
+    except requests.RequestException as exc:
+        detail = ""
+        if exc.response is not None:
+            detail = exc.response.text[:1000]
+
+        raise RuntimeError(
+            f"Jina reranking request failed: {exc}. {detail}"
+        ) from exc
+
+    results = response.json().get("results", [])
 
     reranked_results = []
 
-    for chunk, score in zip(candidates, scores):
-        result = chunk.copy()
-        result["rerank_score"] = float(score)
+    for item in results:
+        index = item["index"]
+
+        if index < 0 or index >= len(candidates):
+            raise RuntimeError("Jina returned an invalid document index")
+
+        result = candidates[index].copy()
+        result["rerank_score"] = float(item["relevance_score"])
         reranked_results.append(result)
 
-    reranked_results.sort(
-        key=lambda item: item["rerank_score"],
-        reverse=True
-    )
-
-    return reranked_results[:top_k]
+    return reranked_results
